@@ -16,8 +16,15 @@ NC='\033[0m' # No Color
 
 # 检查是否为 root 用户
 if [ "$EUID" -eq 0 ]; then 
-   echo -e "${RED}请不要使用 root 用户运行此脚本${NC}"
-   exit 1
+   echo -e "${YELLOW}警告: 检测到使用 root 用户运行${NC}"
+   echo -e "${YELLOW}建议: 使用普通用户运行以提高安全性${NC}"
+   read -p "是否继续使用 root 用户? (y/n) " -n 1 -r
+   echo
+   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+       echo "已取消"
+       exit 1
+   fi
+   echo -e "${YELLOW}继续使用 root 用户部署...${NC}"
 fi
 
 # 检查 Node.js
