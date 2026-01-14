@@ -7,6 +7,8 @@ export class CopyTradingStrategy {
     this.config = config;
     this.minSignalStrength = config.minSignalStrength || 0.7;
     this.smartMoneyAddresses = config.smartMoneyAddresses || [];
+    this.seenTradeIds = new Set();
+    this.maxSeen = 5000;
   }
 
   /**
@@ -123,15 +125,59 @@ export class CopyTradingStrategy {
     const signals = [];
 
     try {
+      const limit = this.config.copyTradeFetchLimit || 50;
+      const sizeMultiplier = this.config.copyTradeSizeMultiplier || 0.1;
+
       for (const address of this.smartMoneyAddresses) {
-        // TODO: 实现聪明钱跟踪
-        // 1. 获取该地址的最近交易
-        // 2. 分析交易模式和胜率
-        // 3. 生成跟单信号
-        
-        // 示例：检查该地址是否有新交易
-        // const trades = await this.client.getTradesByAddress(address);
-        // 分析并生成信号
+        const trades = await this.client.getTradesByAddress(address, limit);
+        if (!Array.isArray(trades) || trades.length === 0) continue;
+
+        for (const t of trades) {
+          const tradeId = t.id || t.tradeID || t.tradeId || t.hash;
+          if (tradeId && this.seenTradeIds.has(tradeId)) continue;
+
+          if (tradeId) {
+            this.seenTradeIds.add(tradeId);
+            // 防止 set 无限增长
+            if (this.seenTradeIds.size > this.maxSeen) {
+              // 简单清理：重建一个较小的集合
+              this.seenTradeIds = new Set(Array.from(this.seenTradeIds).slice(-Math.floor(this.maxSeen / 2)));
+            }
+          }
+
+          // 兼容字段：tokenID / tokenId / marketId 等
+          const tokenId = t.tokenID || t.tokenId || t.marketId || t.marketID;
+          const side = (t.side || t.takerSide || t.makerSide || '').toString().toLowerCase();
+          const price = Number(t.price ?? t.avgPrice ?? t.executionPrice);
+          const size = Number(t.size ?? t.amount ?? t.quantity);
+
+          // 不足信息则跳过
+          if (!tokenId || !side || !Number.isFinite(price) || !Number.isFinite(size)) continue;
+
+          // 跟单规模：按比例复制，并交给风控再做上限控制
+          const copySize = Math.max(0, size * sizeMultiplier);
+
+          signals.push({
+            type: 'copy_smart_money',
+            // 这里用 marketId 字段承载 tokenId，方便日志展示；真实下单时需要按你的 executeTrade 结构再适配
+            marketId: tokenId,
+            tokenId,
+            direction: side,
+            side,
+            price,
+            size: copySize,
+            amount: copySize,
+            strength: 0.9,
+            // 默认不用于套利判断，避免被风控当成可执行套利机会
+            expectedProfit: 0,
+            reason: `跟随地址 ${address} 的成交`,
+            details: {
+              sourceAddress: address,
+              originalTrade: t,
+              multiplier: sizeMultiplier,
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('跟随聪明钱时出错:', error);

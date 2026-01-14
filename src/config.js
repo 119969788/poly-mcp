@@ -29,8 +29,14 @@ function getConfig() {
   
   // 策略配置
   enableCopyTrading: process.env.ENABLE_COPY_TRADING !== 'false',
+  // 跟单是否允许真实下单（默认关闭，先只产出信号/日志）
+  enableCopyTradingExecution: process.env.ENABLE_COPY_TRADING_EXECUTION === 'true',
   minSignalStrength: parseFloat(process.env.MIN_SIGNAL_STRENGTH || '0.7'),
   minLargeTradeSize: parseFloat(process.env.MIN_LARGE_TRADE_SIZE || '1000'),
+  // 跟单：复制比例（0.1 表示跟随原单 10% 规模）
+  copyTradeSizeMultiplier: parseFloat(process.env.COPY_TRADE_SIZE_MULTIPLIER || '0.1'),
+  // 跟单：每个地址每次拉取多少条成交
+  copyTradeFetchLimit: parseInt(process.env.COPY_TRADE_FETCH_LIMIT || '50'),
   
   // 聪明钱地址列表（用于跟单策略）
   smartMoneyAddresses: process.env.SMART_MONEY_ADDRESSES 

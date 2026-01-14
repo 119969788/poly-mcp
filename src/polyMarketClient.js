@@ -13,6 +13,7 @@ export class PolyMarketClient {
     this.client = null;
     this.signer = null;
     this.warnedMissingGetOrders = false;
+    this.warnedMissingGetTrades = false;
   }
 
   /**
@@ -251,6 +252,12 @@ export class PolyMarketClient {
     }
 
     try {
+      // 优先使用 getTrades（很多版本都有），作为“历史成交/交易”的近似
+      if (typeof this.client.getTrades === 'function') {
+        const trades = await this.client.getTrades({ limit });
+        return Array.isArray(trades) ? trades : [];
+      }
+
       // 检查方法是否存在
       if (typeof this.client.getOrders !== 'function') {
         if (!this.warnedMissingGetOrders) {
@@ -265,6 +272,50 @@ export class PolyMarketClient {
     } catch (error) {
       console.error('获取交易历史失败:', error);
       // 避免因历史记录失败导致整个循环中断
+      return [];
+    }
+  }
+
+  /**
+   * 获取某个地址的最新成交（若 clob-client 支持）
+   * 注意：不同版本参数名可能不同，此处做尽量兼容的尝试
+   */
+  async getTradesByAddress(address, limit = 50) {
+    if (!this.connected || !this.client) {
+      throw new Error('客户端未连接');
+    }
+
+    try {
+      if (typeof this.client.getTrades !== 'function') {
+        if (!this.warnedMissingGetTrades) {
+          console.warn('⚠️  getTrades 方法不存在，无法按地址获取成交（仅提示一次）');
+          this.warnedMissingGetTrades = true;
+        }
+        return [];
+      }
+
+      // 常见字段：address / trader / maker / taker（不同版本可能不同）
+      const candidates = [
+        { address, limit },
+        { trader: address, limit },
+        { maker: address, limit },
+        { taker: address, limit },
+      ];
+
+      for (const params of candidates) {
+        try {
+          const res = await this.client.getTrades(params);
+          if (Array.isArray(res)) return res;
+          if (res && Array.isArray(res.trades)) return res.trades;
+          if (res && Array.isArray(res.data)) return res.data;
+        } catch {
+          // 尝试下一种参数
+        }
+      }
+
+      return [];
+    } catch (error) {
+      console.error('按地址获取成交失败:', error);
       return [];
     }
   }

@@ -113,6 +113,12 @@ export class ArbitrageBot {
           console.log(`👥 发现 ${copySignals.length} 个跟单信号`);
           
           for (const signal of copySignals) {
+            // 默认：跟单只产出信号，不自动下单（避免误操作）
+            if (!this.config.enableCopyTradingExecution) {
+              console.log(`📝 跟单信号（未执行，下单开关未开启）: ${signal.marketId || signal.tokenId || 'unknown'} ${signal.direction || signal.side || ''}`);
+              continue;
+            }
+
             if (await this.riskManager.shouldExecute(signal)) {
               await this.executeTrade(signal);
             }
