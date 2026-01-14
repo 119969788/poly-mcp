@@ -48,6 +48,52 @@ async function generateApiKey() {
     console.log('   使用私钥派生 API 凭证（如果已存在则获取现有凭证）...');
     
     let userApiCreds;
+    
+    // 检查方法是否存在
+    if (typeof client.createOrDeriveApiKey !== 'function') {
+      console.error('   ❌ createOrDeriveApiKey 方法不存在');
+      console.log('\n💡 解决方案:');
+      console.log('   1. 更新包到最新版本:');
+      console.log('      cd ~/poly-mcp');
+      console.log('      npm install @polymarket/clob-client@latest');
+      console.log('      npm run generate-api');
+      console.log('');
+      console.log('   2. 或者手动从 Polymarket.com 获取 API 凭证');
+      console.log('      - 登录 Polymarket.com');
+      console.log('      - 进入账户设置');
+      console.log('      - 找到 API 密钥部分');
+      console.log('      - 生成或查看 API 凭证');
+      console.log('      - 手动添加到 .env 文件');
+      console.log('');
+      console.log('   3. 查看详细修复指南:');
+      console.log('      cat FIX_API_KEY_METHOD.md');
+      console.log('');
+      
+      // 列出所有可用方法用于调试
+      const availableMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(client))
+        .filter(name => typeof client[name] === 'function' && !name.startsWith('_'));
+      console.log('🔍 可用的客户端方法:');
+      console.log('   ', availableMethods.slice(0, 15).join(', '));
+      if (availableMethods.length > 15) {
+        console.log('   ... 还有', availableMethods.length - 15, '个方法');
+      }
+      
+      // 检查是否有类似的方法
+      const apiMethods = availableMethods.filter(m => 
+        m.toLowerCase().includes('api') || 
+        m.toLowerCase().includes('key') ||
+        m.toLowerCase().includes('credential') ||
+        m.toLowerCase().includes('derive') ||
+        m.toLowerCase().includes('create')
+      );
+      if (apiMethods.length > 0) {
+        console.log('\n🔍 可能的 API 相关方法:');
+        console.log('   ', apiMethods.join(', '));
+      }
+      
+      throw new Error('createOrDeriveApiKey 方法不存在，请更新包或手动配置 API 凭证');
+    }
+    
     try {
       // 根据官方文档，使用 createOrDeriveApiKey 方法
       userApiCreds = await client.createOrDeriveApiKey();
@@ -55,17 +101,16 @@ async function generateApiKey() {
     } catch (error) {
       console.error('   ❌ API 凭证派生失败:', error.message);
       
-      // 如果是方法不存在，提供详细错误信息
-      if (error.message.includes('is not a function')) {
-        console.log('\n💡 可能的原因:');
-        console.log('   1. @polymarket/clob-client 版本不匹配');
-        console.log('   2. 请确保安装最新版本: npm install @polymarket/clob-client@latest');
-        console.log('   3. 检查当前版本: npm list @polymarket/clob-client');
-        console.log('\n🔍 调试信息:');
-        const availableMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(client))
-          .filter(name => typeof client[name] === 'function' && !name.startsWith('_'));
-        console.log('   可用的方法:', availableMethods.slice(0, 10).join(', '), '...');
-      }
+      // 提供详细错误信息
+      console.log('\n💡 可能的原因:');
+      console.log('   1. 网络连接问题');
+      console.log('   2. 私钥格式错误');
+      console.log('   3. Polymarket API 服务问题');
+      console.log('\n请检查:');
+      console.log('   1. 网络连接是否正常');
+      console.log('   2. 私钥格式是否正确（0x 开头，66 个字符）');
+      console.log('   3. 查看详细错误信息');
+      
       throw error;
     }
     
