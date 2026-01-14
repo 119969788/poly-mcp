@@ -31,6 +31,15 @@ function getConfig() {
   enableCopyTrading: process.env.ENABLE_COPY_TRADING !== 'false',
   // 跟单是否允许真实下单（默认关闭，先只产出信号/日志）
   enableCopyTradingExecution: process.env.ENABLE_COPY_TRADING_EXECUTION === 'true',
+  
+  // 跟单策略分别开关
+  // 策略1: 大额交易跟随
+  enableCopyLargeTrades: process.env.ENABLE_COPY_LARGE_TRADES !== 'false',
+  // 策略2: 聪明钱跟随（独立模块）
+  enableSmartMoney: process.env.ENABLE_SMART_MONEY !== 'false',
+  // 策略3: 高胜率交易者跟随
+  enableCopyHighWinRate: process.env.ENABLE_COPY_HIGH_WIN_RATE !== 'false',
+  
   minSignalStrength: parseFloat(process.env.MIN_SIGNAL_STRENGTH || '0.7'),
   minLargeTradeSize: parseFloat(process.env.MIN_LARGE_TRADE_SIZE || '1000'),
   // 跟单：复制比例（0.1 表示跟随原单 10% 规模）

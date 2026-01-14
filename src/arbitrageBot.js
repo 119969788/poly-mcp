@@ -1,6 +1,7 @@
 import { PolyMarketClient } from './polyMarketClient.js';
 import { ArbitrageStrategy } from './strategies/arbitrageStrategy.js';
 import { CopyTradingStrategy } from './strategies/copyTradingStrategy.js';
+import { SmartMoneyStrategy } from './strategies/smartMoneyStrategy.js';
 import { RiskManager } from './riskManager.js';
 
 /**
@@ -12,6 +13,7 @@ export class ArbitrageBot {
     this.client = new PolyMarketClient(config);
     this.arbitrageStrategy = new ArbitrageStrategy(config);
     this.copyTradingStrategy = new CopyTradingStrategy(config);
+    this.smartMoneyStrategy = new SmartMoneyStrategy(config);
     this.riskManager = new RiskManager(config);
     this.isRunning = false;
     this.timer = null;
@@ -19,6 +21,8 @@ export class ArbitrageBot {
       totalOpportunities: 0,
       executedTrades: 0,
       totalProfit: 0,
+      smartMoneySignals: 0,
+      smartMoneyTrades: 0,
       startTime: null
     };
   }
@@ -36,6 +40,11 @@ export class ArbitrageBot {
       // 初始化策略
       await this.arbitrageStrategy.initialize(this.client);
       await this.copyTradingStrategy.initialize(this.client);
+      
+      // 初始化聪明钱策略（独立模块）
+      if (this.config.enableSmartMoney) {
+        await this.smartMoneyStrategy.initialize(this.client);
+      }
       
       console.log('✅ 策略初始化完成');
     } catch (error) {
@@ -126,6 +135,33 @@ export class ArbitrageBot {
         }
       }
 
+      // 4. 执行聪明钱跟单策略（独立模块）
+      if (this.config.enableSmartMoney) {
+        const smartMoneySignals = await this.smartMoneyStrategy.getSignals(markets);
+        
+        if (smartMoneySignals.length > 0) {
+          console.log(`🧠 发现 ${smartMoneySignals.length} 个聪明钱跟单信号`);
+          this.stats.smartMoneySignals += smartMoneySignals.length;
+          
+          for (const signal of smartMoneySignals) {
+            // 聪明钱跟单是否允许真实下单
+            if (!this.config.enableCopyTradingExecution) {
+              console.log(`📝 聪明钱信号（未执行，下单开关未开启）: ${signal.marketId || signal.tokenId || 'unknown'} ${signal.direction || signal.side || ''} - ${signal.reason}`);
+              continue;
+            }
+
+            if (await this.riskManager.shouldExecute(signal)) {
+              const result = await this.executeTrade(signal);
+              if (result.success) {
+                this.stats.smartMoneyTrades++;
+              }
+            } else {
+              console.log(`⚠️  聪明钱交易被风险管理器拒绝: ${signal.reason}`);
+            }
+          }
+        }
+      }
+
       // 打印统计信息
       this.printStats();
       
@@ -179,6 +215,16 @@ export class ArbitrageBot {
     console.log(`   成功率: ${this.stats.totalOpportunities > 0 
       ? ((this.stats.executedTrades / this.stats.totalOpportunities) * 100).toFixed(2) 
       : 0}%`);
+    
+    // 聪明钱策略统计
+    if (this.config.enableSmartMoney) {
+      const smartMoneyStats = this.smartMoneyStrategy.getStats();
+      console.log(`\n🧠 聪明钱策略统计:`);
+      console.log(`   监控地址: ${smartMoneyStats.monitoredAddresses}`);
+      console.log(`   发现信号: ${this.stats.smartMoneySignals}`);
+      console.log(`   执行交易: ${this.stats.smartMoneyTrades}`);
+      console.log(`   已处理交易: ${smartMoneyStats.seenTrades}`);
+    }
   }
 
   /**
