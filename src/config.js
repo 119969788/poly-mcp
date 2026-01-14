@@ -39,8 +39,16 @@ function getConfig() {
   enableSmartMoney: process.env.ENABLE_SMART_MONEY !== 'false',
   // 策略2增强版: 使用事件驱动的聪明钱跟单（参考 poly-mcp）
   useEnhancedSmartMoney: process.env.USE_ENHANCED_SMART_MONEY === 'true',
+  // 策略2 SDK版: 使用 @catalyst-team/poly-sdk 的自动跟单 API（参考 poly-copy-trading）
+  useSDKSmartMoney: process.env.USE_SDK_SMART_MONEY === 'true',
   // 聪明钱检查间隔（毫秒）
   smartMoneyCheckInterval: parseInt(process.env.SMART_MONEY_CHECK_INTERVAL || '10000'),
+  // SDK 跟单参数
+  copySizeScale: parseFloat(process.env.COPY_SIZE_SCALE || '0.1'),
+  maxSlippage: parseFloat(process.env.MAX_SLIPPAGE || '0.03'),
+  orderType: process.env.ORDER_TYPE || 'FOK',
+  minTradeSize: parseFloat(process.env.MIN_TRADE_SIZE || '5'),
+  dryRun: process.env.DRY_RUN !== 'false' && process.env.ENABLE_COPY_TRADING_EXECUTION !== 'true',
   // 策略3: 高胜率交易者跟随
   enableCopyHighWinRate: process.env.ENABLE_COPY_HIGH_WIN_RATE !== 'false',
   

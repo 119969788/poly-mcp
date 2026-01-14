@@ -3,6 +3,7 @@ import { ArbitrageStrategy } from './strategies/arbitrageStrategy.js';
 import { CopyTradingStrategy } from './strategies/copyTradingStrategy.js';
 import { SmartMoneyStrategy } from './strategies/smartMoneyStrategy.js';
 import { SmartMoneyStrategyEnhanced } from './strategies/smartMoneyStrategyEnhanced.js';
+import { SmartMoneySDKStrategy } from './strategies/smartMoneySDKStrategy.js';
 import { RiskManager } from './riskManager.js';
 
 /**
@@ -15,8 +16,11 @@ export class ArbitrageBot {
     this.arbitrageStrategy = new ArbitrageStrategy(config);
     this.copyTradingStrategy = new CopyTradingStrategy(config);
     
-    // 根据配置选择使用增强版或普通版聪明钱策略
-    if (config.useEnhancedSmartMoney) {
+    // 根据配置选择使用哪个版本的聪明钱策略
+    if (config.useSDKSmartMoney) {
+      this.smartMoneyStrategy = new SmartMoneySDKStrategy(config);
+      console.log('📦 使用 SDK 版聪明钱跟单策略（@catalyst-team/poly-sdk）');
+    } else if (config.useEnhancedSmartMoney) {
       this.smartMoneyStrategy = new SmartMoneyStrategyEnhanced(config);
       console.log('📦 使用增强版聪明钱跟单策略（事件驱动）');
     } else {
@@ -55,8 +59,18 @@ export class ArbitrageBot {
       if (this.config.enableSmartMoney) {
         await this.smartMoneyStrategy.initialize(this.client);
         
+        // 如果是 SDK 版，启动自动跟单
+        if (this.config.useSDKSmartMoney && typeof this.smartMoneyStrategy.start === 'function') {
+          // 监听交易事件
+          this.smartMoneyStrategy.on('trade', async (tradeData) => {
+            this.handleSDKTrade(tradeData);
+          });
+          
+          // 启动自动跟单
+          await this.smartMoneyStrategy.start();
+        }
         // 如果是增强版，设置事件监听并启动
-        if (this.config.useEnhancedSmartMoney && typeof this.smartMoneyStrategy.start === 'function') {
+        else if (this.config.useEnhancedSmartMoney && typeof this.smartMoneyStrategy.start === 'function') {
           // 监听新交易事件
           this.smartMoneyStrategy.on('newTrade', async (data) => {
             const { signal } = data;
@@ -238,6 +252,21 @@ export class ArbitrageBot {
   }
 
   /**
+   * 处理 SDK 交易事件
+   */
+  async handleSDKTrade(tradeData) {
+    this.stats.smartMoneySignals++;
+    
+    if (tradeData.success) {
+      this.stats.smartMoneyTrades++;
+      this.stats.totalProfit += tradeData.profit || 0;
+      console.log(`✅ SDK 跟单交易成功: ${tradeData.marketId || tradeData.tokenId}`);
+    } else {
+      console.log(`❌ SDK 跟单交易失败: ${tradeData.error || '未知错误'}`);
+    }
+  }
+
+  /**
    * 处理聪明钱信号
    */
   async handleSmartMoneySignal(signal) {
@@ -278,9 +307,9 @@ export class ArbitrageBot {
       this.timer = null;
     }
 
-    // 停止聪明钱监听（如果是增强版）
-    if (this.config.enableSmartMoney && this.config.useEnhancedSmartMoney && typeof this.smartMoneyStrategy.stop === 'function') {
-      this.smartMoneyStrategy.stop();
+    // 停止聪明钱监听
+    if (this.config.enableSmartMoney && typeof this.smartMoneyStrategy.stop === 'function') {
+      await this.smartMoneyStrategy.stop();
     }
 
     await this.client.disconnect();
