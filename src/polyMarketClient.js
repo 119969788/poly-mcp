@@ -94,11 +94,20 @@ export class PolyMarketClient {
 
     try {
       // 使用 Polymarket API 获取市场
-      const markets = await this.client.getMarkets({ limit });
-      return markets || [];
+      let markets = await this.client.getMarkets({ limit });
+      
+      // 确保返回的是数组
+      if (!Array.isArray(markets)) {
+        console.warn('⚠️  getMarkets 返回的不是数组，返回空数组');
+        return [];
+      }
+      
+      return markets;
     } catch (error) {
       console.error('获取市场数据失败:', error);
-      throw error;
+      // 返回空数组而不是抛出错误，让程序继续运行
+      console.warn('⚠️  返回空市场列表，程序将继续运行');
+      return [];
     }
   }
 

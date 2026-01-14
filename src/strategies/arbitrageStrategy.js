@@ -22,22 +22,43 @@ export class ArbitrageStrategy {
     const opportunities = [];
 
     try {
+      // 确保 markets 是数组
+      if (!Array.isArray(markets)) {
+        console.warn('⚠️  markets 不是数组，返回空机会列表');
+        return [];
+      }
+
+      if (markets.length === 0) {
+        return [];
+      }
+
       // 策略1: 跨市场套利
       // 寻找相同或相似事件在不同市场的价格差异
       const crossMarketOpportunities = await this.findCrossMarketArbitrage(markets);
-      opportunities.push(...crossMarketOpportunities);
+      if (Array.isArray(crossMarketOpportunities)) {
+        opportunities.push(...crossMarketOpportunities);
+      }
 
       // 策略2: 订单簿套利
       // 在同一市场的订单簿中寻找价格差异
-      for (const market of markets.slice(0, 10)) { // 限制检查数量
-        const orderBookOpportunities = await this.findOrderBookArbitrage(market);
-        opportunities.push(...orderBookOpportunities);
+      const marketsToCheck = markets.slice(0, 10); // 限制检查数量
+      for (const market of marketsToCheck) {
+        try {
+          const orderBookOpportunities = await this.findOrderBookArbitrage(market);
+          if (Array.isArray(orderBookOpportunities)) {
+            opportunities.push(...orderBookOpportunities);
+          }
+        } catch (error) {
+          console.error(`检查市场 ${market?.id || 'unknown'} 的订单簿套利时出错:`, error.message);
+        }
       }
 
       // 策略3: Yes/No 价格不一致套利
       // 如果 Yes + No 价格不等于 1，可能存在套利机会
       const priceMismatchOpportunities = await this.findPriceMismatchArbitrage(markets);
-      opportunities.push(...priceMismatchOpportunities);
+      if (Array.isArray(priceMismatchOpportunities)) {
+        opportunities.push(...priceMismatchOpportunities);
+      }
 
     } catch (error) {
       console.error('查找套利机会时出错:', error);
@@ -110,7 +131,13 @@ export class ArbitrageStrategy {
   async findPriceMismatchArbitrage(markets) {
     const opportunities = [];
     
-    for (const market of markets.slice(0, 20)) {
+    // 确保 markets 是数组
+    if (!Array.isArray(markets) || markets.length === 0) {
+      return [];
+    }
+    
+    const marketsToCheck = markets.slice(0, 20);
+    for (const market of marketsToCheck) {
       try {
         const prices = await this.client.getMarketPrices(market.id);
         const totalPrice = prices.yes + prices.no;

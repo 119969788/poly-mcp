@@ -75,7 +75,19 @@ export class ArbitrageBot {
       
       // 1. 获取市场数据
       const markets = await this.client.getActiveMarkets();
+      
+      // 确保 markets 是数组
+      if (!Array.isArray(markets)) {
+        console.warn('⚠️  获取的市场数据不是数组，跳过本次循环');
+        return;
+      }
+      
       console.log(`📊 发现 ${markets.length} 个活跃市场`);
+      
+      if (markets.length === 0) {
+        console.log('📊 当前没有活跃市场，等待下次扫描...');
+        return;
+      }
 
       // 2. 执行套利策略
       const arbitrageOpportunities = await this.arbitrageStrategy.findOpportunities(markets);

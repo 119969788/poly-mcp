@@ -35,7 +35,9 @@ export class CopyTradingStrategy {
 
       // 策略3: 跟随高胜率交易者
       const highWinRateSignals = await this.followHighWinRateTraders(markets);
-      signals.push(...highWinRateSignals);
+      if (Array.isArray(highWinRateSignals)) {
+        signals.push(...highWinRateSignals);
+      }
 
     } catch (error) {
       console.error('获取跟单信号时出错:', error);
@@ -56,7 +58,13 @@ export class CopyTradingStrategy {
     const minTradeSize = this.config.minLargeTradeSize || 1000; // 最小交易金额（USDC）
 
     try {
-      for (const market of markets.slice(0, 20)) {
+      // 确保 markets 是数组
+      if (!Array.isArray(markets) || markets.length === 0) {
+        return [];
+      }
+
+      const marketsToCheck = markets.slice(0, 20);
+      for (const market of marketsToCheck) {
         // TODO: 实现大额交易检测
         // 1. 获取最近的交易记录
         // 2. 筛选大额交易
