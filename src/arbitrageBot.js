@@ -2,6 +2,7 @@ import { PolyMarketClient } from './polyMarketClient.js';
 import { ArbitrageStrategy } from './strategies/arbitrageStrategy.js';
 import { CopyTradingStrategy } from './strategies/copyTradingStrategy.js';
 import { SmartMoneyStrategy } from './strategies/smartMoneyStrategy.js';
+import { SmartMoneyStrategyEnhanced } from './strategies/smartMoneyStrategyEnhanced.js';
 import { RiskManager } from './riskManager.js';
 
 /**
@@ -13,7 +14,16 @@ export class ArbitrageBot {
     this.client = new PolyMarketClient(config);
     this.arbitrageStrategy = new ArbitrageStrategy(config);
     this.copyTradingStrategy = new CopyTradingStrategy(config);
-    this.smartMoneyStrategy = new SmartMoneyStrategy(config);
+    
+    // 根据配置选择使用增强版或普通版聪明钱策略
+    if (config.useEnhancedSmartMoney) {
+      this.smartMoneyStrategy = new SmartMoneyStrategyEnhanced(config);
+      console.log('📦 使用增强版聪明钱跟单策略（事件驱动）');
+    } else {
+      this.smartMoneyStrategy = new SmartMoneyStrategy(config);
+      console.log('📦 使用标准版聪明钱跟单策略');
+    }
+    
     this.riskManager = new RiskManager(config);
     this.isRunning = false;
     this.timer = null;
@@ -44,6 +54,18 @@ export class ArbitrageBot {
       // 初始化聪明钱策略（独立模块）
       if (this.config.enableSmartMoney) {
         await this.smartMoneyStrategy.initialize(this.client);
+        
+        // 如果是增强版，设置事件监听并启动
+        if (this.config.useEnhancedSmartMoney && typeof this.smartMoneyStrategy.start === 'function') {
+          // 监听新交易事件
+          this.smartMoneyStrategy.on('newTrade', async (data) => {
+            const { signal } = data;
+            this.handleSmartMoneySignal(signal);
+          });
+          
+          // 启动监听
+          await this.smartMoneyStrategy.start();
+        }
       }
       
       console.log('✅ 策略初始化完成');
@@ -136,7 +158,8 @@ export class ArbitrageBot {
       }
 
       // 4. 执行聪明钱跟单策略（独立模块）
-      if (this.config.enableSmartMoney) {
+      // 注意：增强版使用事件驱动，不需要在这里轮询
+      if (this.config.enableSmartMoney && !this.config.useEnhancedSmartMoney) {
         const smartMoneySignals = await this.smartMoneyStrategy.getSignals(markets);
         
         if (smartMoneySignals.length > 0) {
@@ -144,20 +167,7 @@ export class ArbitrageBot {
           this.stats.smartMoneySignals += smartMoneySignals.length;
           
           for (const signal of smartMoneySignals) {
-            // 聪明钱跟单是否允许真实下单
-            if (!this.config.enableCopyTradingExecution) {
-              console.log(`📝 聪明钱信号（未执行，下单开关未开启）: ${signal.marketId || signal.tokenId || 'unknown'} ${signal.direction || signal.side || ''} - ${signal.reason}`);
-              continue;
-            }
-
-            if (await this.riskManager.shouldExecute(signal)) {
-              const result = await this.executeTrade(signal);
-              if (result.success) {
-                this.stats.smartMoneyTrades++;
-              }
-            } else {
-              console.log(`⚠️  聪明钱交易被风险管理器拒绝: ${signal.reason}`);
-            }
+            await this.handleSmartMoneySignal(signal);
           }
         }
       }
@@ -228,6 +238,31 @@ export class ArbitrageBot {
   }
 
   /**
+   * 处理聪明钱信号
+   */
+  async handleSmartMoneySignal(signal) {
+    this.stats.smartMoneySignals++;
+    
+    // 聪明钱跟单是否允许真实下单
+    if (!this.config.enableCopyTradingExecution) {
+      console.log(`📝 聪明钱信号（未执行，下单开关未开启）: ${signal.marketId || signal.tokenId || 'unknown'} ${signal.direction || signal.side || ''} - ${signal.reason}`);
+      return;
+    }
+
+    if (await this.riskManager.shouldExecute(signal)) {
+      const result = await this.executeTrade(signal);
+      if (result.success) {
+        this.stats.smartMoneyTrades++;
+        console.log(`✅ 聪明钱跟单交易执行成功: ${signal.marketId || signal.tokenId}`);
+      } else {
+        console.log(`❌ 聪明钱跟单交易失败: ${result.error}`);
+      }
+    } else {
+      console.log(`⚠️  聪明钱交易被风险管理器拒绝: ${signal.reason}`);
+    }
+  }
+
+  /**
    * 停止机器人
    */
   async stop() {
@@ -241,6 +276,11 @@ export class ArbitrageBot {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+
+    // 停止聪明钱监听（如果是增强版）
+    if (this.config.enableSmartMoney && this.config.useEnhancedSmartMoney && typeof this.smartMoneyStrategy.stop === 'function') {
+      this.smartMoneyStrategy.stop();
     }
 
     await this.client.disconnect();

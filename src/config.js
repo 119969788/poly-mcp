@@ -37,6 +37,10 @@ function getConfig() {
   enableCopyLargeTrades: process.env.ENABLE_COPY_LARGE_TRADES !== 'false',
   // 策略2: 聪明钱跟随（独立模块）
   enableSmartMoney: process.env.ENABLE_SMART_MONEY !== 'false',
+  // 策略2增强版: 使用事件驱动的聪明钱跟单（参考 poly-mcp）
+  useEnhancedSmartMoney: process.env.USE_ENHANCED_SMART_MONEY === 'true',
+  // 聪明钱检查间隔（毫秒）
+  smartMoneyCheckInterval: parseInt(process.env.SMART_MONEY_CHECK_INTERVAL || '10000'),
   // 策略3: 高胜率交易者跟随
   enableCopyHighWinRate: process.env.ENABLE_COPY_HIGH_WIN_RATE !== 'false',
   
