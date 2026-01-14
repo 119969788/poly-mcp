@@ -18,7 +18,9 @@
   "license": "MIT",
   "dependencies": {
     "@catalyst-team/poly-mcp": "^0.1.3",
-    "@catalyst-team/poly-sdk": "^0.4.3",
     "dotenv": "^16.4.5"
+  },
+  "overrides": {
+    "@catalyst-team/poly-sdk": "^0.4.0"
   }
 }
