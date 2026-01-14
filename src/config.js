@@ -1,6 +1,13 @@
 /**
  * 配置文件
+ * 注意: 此文件在环境变量加载后导入
  */
+
+// 确保环境变量已加载
+if (!process.env.PRIVATE_KEY) {
+  console.warn('⚠️  警告: PRIVATE_KEY 在 config.js 加载时未找到');
+  console.warn('   这可能是正常的，如果 index.js 中已加载环境变量');
+}
 
 export const config = {
   // MCP 服务器配置
