@@ -286,36 +286,82 @@ export class PolyMarketClient {
     }
 
     try {
-      if (typeof this.client.getTrades !== 'function') {
-        if (!this.warnedMissingGetTrades) {
-          console.warn('⚠️  getTrades 方法不存在，无法按地址获取成交（仅提示一次）');
-          this.warnedMissingGetTrades = true;
-        }
-        return [];
+      // 检查可用的方法
+      const availableMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.client))
+        .filter(name => typeof this.client[name] === 'function' && name.toLowerCase().includes('trade'));
+      
+      const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
+      if (debugMode) {
+        console.log(`   🔍 可用的交易相关方法: ${availableMethods.join(', ')}`);
       }
 
-      // 常见字段：address / trader / maker / taker（不同版本可能不同）
-      const candidates = [
-        { address, limit },
-        { trader: address, limit },
-        { maker: address, limit },
-        { taker: address, limit },
-      ];
+      // 尝试 getTrades 方法
+      if (typeof this.client.getTrades === 'function') {
+        // 常见字段：address / trader / maker / taker（不同版本可能不同）
+        const candidates = [
+          { address, limit },
+          { trader: address, limit },
+          { maker: address, limit },
+          { taker: address, limit },
+          { user: address, limit },
+          { account: address, limit },
+        ];
 
-      for (const params of candidates) {
-        try {
-          const res = await this.client.getTrades(params);
-          if (Array.isArray(res)) return res;
-          if (res && Array.isArray(res.trades)) return res.trades;
-          if (res && Array.isArray(res.data)) return res.data;
-        } catch {
-          // 尝试下一种参数
+        for (const params of candidates) {
+          try {
+            const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
+            if (debugMode) {
+              console.log(`   🔍 尝试参数:`, params);
+            }
+            const res = await this.client.getTrades(params);
+            const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
+            if (Array.isArray(res)) {
+              if (debugMode) {
+                console.log(`   ✅ 成功获取 ${res.length} 条交易（直接数组）`);
+              }
+              return res;
+            }
+            if (res && Array.isArray(res.trades)) {
+              if (debugMode) {
+                console.log(`   ✅ 成功获取 ${res.trades.length} 条交易（res.trades）`);
+              }
+              return res.trades;
+            }
+            if (res && Array.isArray(res.data)) {
+              if (debugMode) {
+                console.log(`   ✅ 成功获取 ${res.data.length} 条交易（res.data）`);
+              }
+              return res.data;
+            }
+            if (res && Array.isArray(res.results)) {
+              if (debugMode) {
+                console.log(`   ✅ 成功获取 ${res.results.length} 条交易（res.results）`);
+              }
+              return res.results;
+            }
+          } catch (err) {
+            const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
+            if (debugMode) {
+              console.log(`   ⚠️  参数 ${JSON.stringify(params)} 失败:`, err.message);
+            }
+            // 尝试下一种参数
+          }
+        }
+      } else {
+        if (!this.warnedMissingGetTrades) {
+          console.warn('⚠️  getTrades 方法不存在，无法按地址获取成交（仅提示一次）');
+          console.warn(`   可用方法: ${availableMethods.join(', ') || '无'}`);
+          this.warnedMissingGetTrades = true;
         }
       }
 
       return [];
     } catch (error) {
-      console.error('按地址获取成交失败:', error);
+      console.error('❌ 按地址获取成交失败:', error.message);
+      const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
+      if (debugMode) {
+        console.error('   错误详情:', error);
+      }
       return [];
     }
   }

@@ -54,7 +54,9 @@ function getConfig() {
   
     // 日志配置
     logLevel: process.env.LOG_LEVEL || 'info',
-    enableDetailedLogs: process.env.ENABLE_DETAILED_LOGS === 'true'
+    enableDetailedLogs: process.env.ENABLE_DETAILED_LOGS === 'true',
+    // 聪明钱跟单详细日志（用于调试）
+    enableSmartMoneyDebug: process.env.ENABLE_SMART_MONEY_DEBUG === 'true'
   };
 }
 
