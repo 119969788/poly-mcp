@@ -96,9 +96,30 @@ export class PolyMarketClient {
       // 使用 Polymarket API 获取市场
       let markets = await this.client.getMarkets({ limit });
       
+      // 处理不同的返回格式
+      if (!markets) {
+        console.warn('⚠️  getMarkets 返回 null/undefined');
+        return [];
+      }
+      
+      // 如果返回的是对象，尝试提取数组
+      if (typeof markets === 'object' && !Array.isArray(markets)) {
+        // 可能是 { markets: [...] } 或 { data: [...] } 格式
+        if (markets.markets && Array.isArray(markets.markets)) {
+          markets = markets.markets;
+        } else if (markets.data && Array.isArray(markets.data)) {
+          markets = markets.data;
+        } else if (markets.results && Array.isArray(markets.results)) {
+          markets = markets.results;
+        } else {
+          console.warn('⚠️  getMarkets 返回的对象格式未知:', Object.keys(markets));
+          return [];
+        }
+      }
+      
       // 确保返回的是数组
       if (!Array.isArray(markets)) {
-        console.warn('⚠️  getMarkets 返回的不是数组，返回空数组');
+        console.warn('⚠️  getMarkets 返回的不是数组，类型:', typeof markets);
         return [];
       }
       
