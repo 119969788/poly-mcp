@@ -33,7 +33,47 @@ async function generateApiKey() {
 
     // 生成或获取 API 凭证
     console.log('\n📝 正在生成/获取 API 凭证...');
-    const userApiCreds = await client.createOrDeriveApiKey();
+    
+    // 检查可用的方法并尝试生成 API 密钥
+    let userApiCreds;
+    
+    // 列出所有可用方法用于调试
+    const availableMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(client))
+      .filter(name => typeof client[name] === 'function' && !name.startsWith('_'));
+    console.log('🔍 可用的客户端方法:', availableMethods.join(', '));
+    
+    // 尝试不同的方法名
+    if (typeof client.createOrDeriveApiKey === 'function') {
+      console.log('使用 createOrDeriveApiKey 方法...');
+      userApiCreds = await client.createOrDeriveApiKey();
+    } else if (typeof client.createApiKey === 'function') {
+      console.log('使用 createApiKey 方法...');
+      userApiCreds = await client.createApiKey();
+    } else if (typeof client.deriveApiKey === 'function') {
+      console.log('使用 deriveApiKey 方法...');
+      userApiCreds = await client.deriveApiKey();
+    } else if (typeof client.getApiKey === 'function') {
+      console.log('使用 getApiKey 方法...');
+      userApiCreds = await client.getApiKey();
+    } else {
+      // 如果都没有找到，尝试手动生成
+      console.log('⚠️  未找到标准的 API 密钥生成方法');
+      console.log('💡 提示: 某些版本的 clob-client 可能需要手动配置 API 密钥');
+      console.log('   请参考: https://docs.polymarket.com/clob-client');
+      console.log('\n你可以:');
+      console.log('   1. 从 Polymarket.com 账户获取 API 密钥');
+      console.log('   2. 或者手动设置以下环境变量:');
+      console.log('      POLYMARKET_API_KEY=your_key');
+      console.log('      POLYMARKET_API_SECRET=your_secret');
+      console.log('      POLYMARKET_API_PASSPHRASE=your_passphrase');
+      
+      // 返回一个提示对象而不是抛出错误
+      return {
+        error: 'API_KEY_GENERATION_NOT_AVAILABLE',
+        message: '请手动配置 API 凭证或从 Polymarket.com 获取',
+        walletAddress: signer.address
+      };
+    }
 
     console.log('\n✅ API 凭证生成成功！');
     console.log('\n请将以下信息添加到 .env 文件中：');
@@ -57,11 +97,17 @@ async function generateApiKey() {
     console.log(`   资金地址: ${FUNDER_ADDRESS}`);
 
     // 使用完整凭证重新初始化客户端
+    const apiCreds = {
+      apiKey: apiKey,
+      secret: secret,
+      passphrase: passphrase
+    };
+    
     const fullClient = new ClobClient(
       HOST,
       CHAIN_ID,
       signer,
-      userApiCreds,
+      apiCreds,
       SIGNATURE_TYPE,
       FUNDER_ADDRESS
     );
@@ -73,9 +119,9 @@ async function generateApiKey() {
     console.log('   3. 确保钱包中有足够的 USDC 用于交易');
 
     return {
-      apiKey: userApiCreds.apiKey,
-      secret: userApiCreds.secret,
-      passphrase: userApiCreds.passphrase,
+      apiKey: apiKey,
+      secret: secret,
+      passphrase: passphrase,
       signatureType: SIGNATURE_TYPE,
       funderAddress: FUNDER_ADDRESS,
       walletAddress: signer.address
