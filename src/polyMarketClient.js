@@ -290,6 +290,7 @@ export class PolyMarketClient {
       const availableMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.client))
         .filter(name => typeof this.client[name] === 'function' && name.toLowerCase().includes('trade'));
       
+      // 在函数开始处声明一次 debugMode
       const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
       if (debugMode) {
         console.log(`   🔍 可用的交易相关方法: ${availableMethods.join(', ')}`);
@@ -309,12 +310,10 @@ export class PolyMarketClient {
 
         for (const params of candidates) {
           try {
-            const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
             if (debugMode) {
               console.log(`   🔍 尝试参数:`, params);
             }
             const res = await this.client.getTrades(params);
-            const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
             if (Array.isArray(res)) {
               if (debugMode) {
                 console.log(`   ✅ 成功获取 ${res.length} 条交易（直接数组）`);
@@ -340,7 +339,6 @@ export class PolyMarketClient {
               return res.results;
             }
           } catch (err) {
-            const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
             if (debugMode) {
               console.log(`   ⚠️  参数 ${JSON.stringify(params)} 失败:`, err.message);
             }
@@ -358,7 +356,6 @@ export class PolyMarketClient {
       return [];
     } catch (error) {
       console.error('❌ 按地址获取成交失败:', error.message);
-      const debugMode = this.config?.enableSmartMoneyDebug || this.config?.enableDetailedLogs;
       if (debugMode) {
         console.error('   错误详情:', error);
       }
