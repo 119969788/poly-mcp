@@ -31,6 +31,7 @@ export class ArbitrageBot {
     this.riskManager = new RiskManager(config);
     this.isRunning = false;
     this.timer = null;
+    this.smartMoneyCheckCount = 0;
     this.stats = {
       totalOpportunities: 0,
       executedTrades: 0,
@@ -179,8 +180,10 @@ export class ArbitrageBot {
       }
 
       // 4. 执行聪明钱跟单策略（独立模块）
-      // 注意：增强版使用事件驱动，不需要在这里轮询
-      if (this.config.enableSmartMoney && !this.config.useEnhancedSmartMoney) {
+      // 注意：增强版和SDK版使用事件驱动，不需要在这里轮询
+      if (this.config.enableSmartMoney && 
+          !this.config.useEnhancedSmartMoney && 
+          !this.config.useSDKSmartMoney) {
         const smartMoneySignals = await this.smartMoneyStrategy.getSignals(markets);
         
         if (smartMoneySignals.length > 0) {
@@ -189,6 +192,13 @@ export class ArbitrageBot {
           
           for (const signal of smartMoneySignals) {
             await this.handleSmartMoneySignal(signal);
+          }
+        } else {
+          // 即使没有信号，也显示状态（每10次循环显示一次）
+          if (!this.smartMoneyCheckCount) this.smartMoneyCheckCount = 0;
+          this.smartMoneyCheckCount++;
+          if (this.smartMoneyCheckCount % 10 === 0) {
+            console.log(`🧠 聪明钱跟单: 持续监控中... (已检查 ${this.smartMoneyCheckCount} 次)`);
           }
         }
       }

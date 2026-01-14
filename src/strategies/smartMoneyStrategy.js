@@ -33,11 +33,13 @@ export class SmartMoneyStrategy {
     const signals = [];
 
     if (this.smartMoneyAddresses.length === 0) {
+      console.warn('⚠️  未设置聪明钱地址，无法跟单');
+      console.warn('   请在 .env 文件中设置: SMART_MONEY_ADDRESSES=0x地址1,0x地址2');
       return signals;
     }
 
     try {
-      console.log(`🔍 开始检查 ${this.smartMoneyAddresses.length} 个聪明钱地址...`);
+      console.log(`\n🧠 开始检查 ${this.smartMoneyAddresses.length} 个聪明钱地址...`);
       
       for (const address of this.smartMoneyAddresses) {
         try {
@@ -175,6 +177,17 @@ export class SmartMoneyStrategy {
           
           if (newTradesCount > 0) {
             console.log(`   🎯 成功生成 ${newTradesCount} 个跟单信号`);
+          } else if (trades.length > 0) {
+            console.log(`   ⚠️  有 ${trades.length} 条交易，但未生成新信号`);
+            if (skippedCount > 0) {
+              console.log(`      - ${skippedCount} 条已处理过（去重）`);
+            }
+            if (invalidCount > 0) {
+              console.log(`      - ${invalidCount} 条数据无效（缺少必要字段）`);
+              if (this.debugMode) {
+                console.log(`   💡 提示: 启用调试模式查看原始数据: ENABLE_SMART_MONEY_DEBUG=true`);
+              }
+            }
           }
 
         } catch (error) {
@@ -184,6 +197,22 @@ export class SmartMoneyStrategy {
 
     } catch (error) {
       console.error('❌ 聪明钱跟单策略出错:', error);
+    }
+
+    // 显示最终统计
+    if (signals.length === 0) {
+      console.log(`\n⚠️  本次检查未发现新的聪明钱交易信号`);
+      console.log(`   可能原因:`);
+      console.log(`   1. 聪明钱地址暂无新交易`);
+      console.log(`   2. 所有交易都已处理过（去重）`);
+      console.log(`   3. 交易数据格式不匹配（启用调试模式查看）`);
+      console.log(`   4. API 无法获取交易数据`);
+      console.log(`\n💡 建议:`);
+      console.log(`   - 启用调试模式: ENABLE_SMART_MONEY_DEBUG=true`);
+      console.log(`   - 检查地址是否有交易活动`);
+      console.log(`   - 查看 API 是否支持按地址获取交易`);
+    } else {
+      console.log(`\n✅ 本次检查发现 ${signals.length} 个聪明钱跟单信号`);
     }
 
     return signals;
