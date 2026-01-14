@@ -250,11 +250,18 @@ export class PolyMarketClient {
     }
 
     try {
+      // 检查方法是否存在
+      if (typeof this.client.getOrders !== 'function') {
+        console.warn('⚠️  getOrders 方法不存在，返回空历史记录');
+        return [];
+      }
+
       const orders = await this.client.getOrders({ limit });
-      return orders || [];
+      return Array.isArray(orders) ? orders : [];
     } catch (error) {
       console.error('获取交易历史失败:', error);
-      throw error;
+      // 避免因历史记录失败导致整个循环中断
+      return [];
     }
   }
 }
