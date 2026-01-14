@@ -34,12 +34,18 @@ export class SmartMoneySDKStrategy extends EventEmitter {
       console.log('✅ 聪明钱跟单策略（SDK版）已初始化');
       console.log('   使用 @catalyst-team/poly-sdk 的自动跟单 API');
       
+      // 检查 SDK 是否可用
+      if (!this.sdk) {
+        throw new Error('SDK 导入失败');
+      }
+      
       // 检查是否已授权 USDC.e
       await this.checkAndApproveUSDC();
       
     } catch (error) {
       console.error('❌ 初始化 SDK 失败:', error.message);
       console.error('   请确保已安装 @catalyst-team/poly-sdk: npm install @catalyst-team/poly-sdk');
+      console.error('   如果 SDK 不支持，建议使用增强版: USE_ENHANCED_SMART_MONEY=true');
       throw error;
     }
   }
@@ -108,29 +114,47 @@ export class SmartMoneySDKStrategy extends EventEmitter {
       }
 
       // 初始化 SDK 实例
-      // 注意：这里需要根据实际的 SDK API 调整
       const sdkInstance = await this.createSDKInstance();
       
-      // 启动自动跟单
-      // 根据 poly-copy-trading 的实现，使用 sdk.smartMoney.startAutoCopyTrading()
-      if (sdkInstance && sdkInstance.smartMoney && sdkInstance.smartMoney.startAutoCopyTrading) {
-        const result = await sdkInstance.smartMoney.startAutoCopyTrading({
-          ...options,
-          targetAddresses: targetAddresses && targetAddresses.length > 0 ? targetAddresses : undefined
-        });
-
-        this.isRunning = true;
-        this.stats.startTime = Date.now();
-        
-        console.log('✅ 聪明钱自动跟单已启动');
-        
-        // 设置事件监听（如果 SDK 支持）
-        this.setupEventListeners(sdkInstance);
-        
-        return result;
-      } else {
-        throw new Error('SDK 不支持 startAutoCopyTrading 方法');
+      // 检查 SDK 的实际结构
+      console.log('🔍 检查 SDK 可用方法...');
+      this.logSDKStructure(sdkInstance);
+      
+      // 尝试多种可能的 API 调用方式
+      const apiMethods = this.findSmartMoneyAPI(sdkInstance);
+      
+      if (apiMethods.length === 0) {
+        console.warn('⚠️  SDK 不支持自动跟单 API，降级到增强版模式');
+        console.warn('   建议：设置 USE_ENHANCED_SMART_MONEY=true 使用增强版');
+        throw new Error('SDK 不支持自动跟单 API，请使用增强版或标准版');
       }
+      
+      // 尝试使用找到的 API
+      for (const method of apiMethods) {
+        try {
+          console.log(`🔍 尝试使用 API: ${method.path}`);
+          const result = await method.call({
+            ...options,
+            targetAddresses: targetAddresses && targetAddresses.length > 0 ? targetAddresses : undefined
+          });
+
+          this.isRunning = true;
+          this.stats.startTime = Date.now();
+          this.sdkInstance = sdkInstance;
+          
+          console.log('✅ 聪明钱自动跟单已启动');
+          
+          // 设置事件监听（如果 SDK 支持）
+          this.setupEventListeners(sdkInstance);
+          
+          return result;
+        } catch (error) {
+          console.warn(`⚠️  API ${method.path} 调用失败:`, error.message);
+          // 继续尝试下一个
+        }
+      }
+      
+      throw new Error('所有 SDK API 调用都失败，请检查 SDK 版本和文档');
       
     } catch (error) {
       console.error('❌ 启动聪明钱跟单失败:', error.message);
@@ -144,24 +168,94 @@ export class SmartMoneySDKStrategy extends EventEmitter {
   async createSDKInstance() {
     try {
       // 根据实际的 SDK API 创建实例
-      // 这里需要根据 @catalyst-team/poly-sdk 的实际 API 调整
+      // 尝试多种可能的初始化方式
       if (this.sdk.createSDK) {
         return this.sdk.createSDK({
           privateKey: this.config.privateKey,
-          // 其他配置...
         });
       } else if (this.sdk.default) {
-        return new this.sdk.default({
+        if (typeof this.sdk.default === 'function') {
+          return new this.sdk.default({
+            privateKey: this.config.privateKey,
+          });
+        } else {
+          return this.sdk.default;
+        }
+      } else if (this.sdk.PolySDK) {
+        return new this.sdk.PolySDK({
+          privateKey: this.config.privateKey,
+        });
+      } else if (this.sdk.init) {
+        return await this.sdk.init({
           privateKey: this.config.privateKey,
         });
       } else {
-        // 尝试直接使用
+        // 尝试直接使用，可能已经是实例
         return this.sdk;
       }
     } catch (error) {
       console.error('❌ 创建 SDK 实例失败:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * 记录 SDK 结构（用于调试）
+   */
+  logSDKStructure(sdkInstance) {
+    if (!this.debugMode) return;
+    
+    console.log('📋 SDK 实例结构:');
+    const keys = Object.keys(sdkInstance || {});
+    console.log(`   顶层属性: ${keys.slice(0, 10).join(', ')}${keys.length > 10 ? '...' : ''}`);
+    
+    if (sdkInstance.smartMoney) {
+      const smartMoneyKeys = Object.keys(sdkInstance.smartMoney);
+      console.log(`   smartMoney 方法: ${smartMoneyKeys.join(', ')}`);
+    }
+  }
+
+  /**
+   * 查找可用的聪明钱 API
+   */
+  findSmartMoneyAPI(sdkInstance) {
+    const methods = [];
+    
+    if (!sdkInstance) return methods;
+    
+    // 方式1: sdkInstance.smartMoney.startAutoCopyTrading
+    if (sdkInstance.smartMoney && typeof sdkInstance.smartMoney.startAutoCopyTrading === 'function') {
+      methods.push({
+        path: 'smartMoney.startAutoCopyTrading',
+        call: (options) => sdkInstance.smartMoney.startAutoCopyTrading(options)
+      });
+    }
+    
+    // 方式2: sdkInstance.startAutoCopyTrading
+    if (typeof sdkInstance.startAutoCopyTrading === 'function') {
+      methods.push({
+        path: 'startAutoCopyTrading',
+        call: (options) => sdkInstance.startAutoCopyTrading(options)
+      });
+    }
+    
+    // 方式3: sdkInstance.smartMoney.start
+    if (sdkInstance.smartMoney && typeof sdkInstance.smartMoney.start === 'function') {
+      methods.push({
+        path: 'smartMoney.start',
+        call: (options) => sdkInstance.smartMoney.start(options)
+      });
+    }
+    
+    // 方式4: sdkInstance.copyTrading
+    if (sdkInstance.copyTrading && typeof sdkInstance.copyTrading.start === 'function') {
+      methods.push({
+        path: 'copyTrading.start',
+        call: (options) => sdkInstance.copyTrading.start(options)
+      });
+    }
+    
+    return methods;
   }
 
   /**

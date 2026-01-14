@@ -61,13 +61,20 @@ export class ArbitrageBot {
         
         // 如果是 SDK 版，启动自动跟单
         if (this.config.useSDKSmartMoney && typeof this.smartMoneyStrategy.start === 'function') {
-          // 监听交易事件
-          this.smartMoneyStrategy.on('trade', async (tradeData) => {
-            this.handleSDKTrade(tradeData);
-          });
-          
-          // 启动自动跟单
-          await this.smartMoneyStrategy.start();
+          try {
+            // 监听交易事件
+            this.smartMoneyStrategy.on('trade', async (tradeData) => {
+              this.handleSDKTrade(tradeData);
+            });
+            
+            // 启动自动跟单
+            await this.smartMoneyStrategy.start();
+          } catch (error) {
+            console.error('❌ SDK 版启动失败，建议切换到增强版');
+            console.error('   在 .env 中设置: USE_ENHANCED_SMART_MONEY=true');
+            console.error('   或设置: USE_SDK_SMART_MONEY=false');
+            // 不抛出错误，让程序继续运行其他策略
+          }
         }
         // 如果是增强版，设置事件监听并启动
         else if (this.config.useEnhancedSmartMoney && typeof this.smartMoneyStrategy.start === 'function') {
