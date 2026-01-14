@@ -8,7 +8,11 @@ export const config = {
   
   // API 配置
   apiKey: process.env.POLYMARKET_API_KEY || '',
+  apiSecret: process.env.POLYMARKET_API_SECRET || '',
+  apiPassphrase: process.env.POLYMARKET_API_PASSPHRASE || '',
   privateKey: process.env.PRIVATE_KEY || '',
+  host: process.env.POLYMARKET_HOST || 'https://clob.polymarket.com',
+  chainId: parseInt(process.env.CHAIN_ID || '137'), // Polygon 主网
   
   // 交易配置
   maxPositionSize: parseFloat(process.env.MAX_POSITION_SIZE || '100'), // USDC
