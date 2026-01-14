@@ -1,15 +1,12 @@
 /**
  * 配置文件
  * 注意: 此文件在环境变量加载后导入
+ * 配置会优先使用环境变量，如果环境变量未设置则使用默认值
  */
 
-// 确保环境变量已加载
-if (!process.env.PRIVATE_KEY) {
-  console.warn('⚠️  警告: PRIVATE_KEY 在 config.js 加载时未找到');
-  console.warn('   这可能是正常的，如果 index.js 中已加载环境变量');
-}
-
-export const config = {
+// 创建一个函数来获取配置，确保每次读取时都使用最新的环境变量
+function getConfig() {
+  return {
   // MCP 服务器配置
   mcpEndpoint: process.env.MCP_ENDPOINT || 'http://localhost:3000',
   
@@ -40,7 +37,22 @@ export const config = {
     ? process.env.SMART_MONEY_ADDRESSES.split(',')
     : [],
   
-  // 日志配置
-  logLevel: process.env.LOG_LEVEL || 'info',
-  enableDetailedLogs: process.env.ENABLE_DETAILED_LOGS === 'true'
-};
+    // 日志配置
+    logLevel: process.env.LOG_LEVEL || 'info',
+    enableDetailedLogs: process.env.ENABLE_DETAILED_LOGS === 'true'
+  };
+}
+
+// 导出配置对象（使用 getter 确保每次访问时读取最新环境变量）
+export const config = new Proxy({}, {
+  get(target, prop) {
+    const configObj = getConfig();
+    return configObj[prop];
+  },
+  ownKeys(target) {
+    return Object.keys(getConfig());
+  },
+  has(target, prop) {
+    return prop in getConfig();
+  }
+});

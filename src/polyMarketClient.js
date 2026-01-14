@@ -19,26 +19,33 @@ export class PolyMarketClient {
    */
   async connect() {
     try {
-      if (!this.config.privateKey) {
+      // 直接从环境变量读取（确保使用最新值）
+      const privateKey = process.env.PRIVATE_KEY || this.config.privateKey;
+      
+      if (!privateKey || privateKey.trim() === '') {
         throw new Error('未设置 PRIVATE_KEY，请在 .env 文件中配置');
       }
 
       console.log('🔌 连接到 Polymarket...');
 
       // Polymarket 配置
-      const HOST = process.env.POLYMARKET_HOST || 'https://clob.polymarket.com';
-      const CHAIN_ID = parseInt(process.env.CHAIN_ID || '137'); // Polygon 主网
+      const HOST = process.env.POLYMARKET_HOST || this.config.host || 'https://clob.polymarket.com';
+      const CHAIN_ID = parseInt(process.env.CHAIN_ID || this.config.chainId || '137'); // Polygon 主网
 
       // 创建签名者
-      this.signer = new Wallet(this.config.privateKey);
+      this.signer = new Wallet(privateKey);
       console.log(`   钱包地址: ${this.signer.address}`);
 
-      // 检查是否有 API 凭证
-      if (this.config.apiKey && this.config.apiSecret && this.config.apiPassphrase) {
+      // 检查是否有 API 凭证（优先使用环境变量）
+      const apiKey = process.env.POLYMARKET_API_KEY || this.config.apiKey;
+      const apiSecret = process.env.POLYMARKET_API_SECRET || this.config.apiSecret;
+      const apiPassphrase = process.env.POLYMARKET_API_PASSPHRASE || this.config.apiPassphrase;
+      
+      if (apiKey && apiSecret && apiPassphrase) {
         const userApiCreds = {
-          apiKey: this.config.apiKey,
-          secret: this.config.apiSecret,
-          passphrase: this.config.apiPassphrase
+          apiKey: apiKey,
+          secret: apiSecret,
+          passphrase: apiPassphrase
         };
 
         const SIGNATURE_TYPE = parseInt(process.env.SIGNATURE_TYPE || '0');
