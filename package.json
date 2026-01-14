@@ -11,7 +11,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "generate-api": "node src/generateApiKey.js"
+    "generate-api": "node src/generateApiKey.js",
+    "check-config": "node check-config.js"
   },
   "keywords": [
     "polymarket",
