@@ -12,6 +12,7 @@ export class PolyMarketClient {
     this.connected = false;
     this.client = null;
     this.signer = null;
+    this.warnedMissingGetOrders = false;
   }
 
   /**
@@ -252,7 +253,10 @@ export class PolyMarketClient {
     try {
       // 检查方法是否存在
       if (typeof this.client.getOrders !== 'function') {
-        console.warn('⚠️  getOrders 方法不存在，返回空历史记录');
+        if (!this.warnedMissingGetOrders) {
+          console.warn('⚠️  getOrders 方法不存在，返回空历史记录（仅提示一次）');
+          this.warnedMissingGetOrders = true;
+        }
         return [];
       }
 
